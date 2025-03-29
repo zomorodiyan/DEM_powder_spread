@@ -17,19 +17,19 @@ newton off
 variable dt equal 1e-6
 
 # Define simulation box limits (in meters, converted from microns)
-variable xmin equal -21e-6
-variable xmax equal  21e-6
-variable ymin equal -21e-6
-variable ymax equal  21e-6
-variable zmin equal -1e-6
-variable zmax equal  11e-6
+variable xmin equal -21e-3
+variable xmax equal  21e-3
+variable ymin equal -21e-3
+variable ymax equal  21e-3
+variable zmin equal -1e-3
+variable zmax equal  11e-3
 
 # Number of atom types: particle and wall
 variable natoms equal 2
 
 # Approximate properties for IN718 (Young's modulus, Poisson's ratio)
-variable youngmodulus1 equal 2.0e11
-variable youngmodulus2 equal 2.0e11
+variable youngsmodulus1 equal 2.0e8
+variable youngsmodulus2 equal 2.0e8
 variable poission1 equal 0.3
 variable poission2 equal 0.3
 
@@ -55,10 +55,10 @@ variable rf22 equal 0.8
 variable nradii equal 4
 
 # Particle radii (meters, half of original diameters)
-variable radius1 equal 6.5e-6
-variable radius2 equal 12.5e-6
-variable radius3 equal 21.5e-6
-variable radius4 equal 30e-6
+variable radius1 equal 6.5e-5
+variable radius2 equal 12.5e-5
+variable radius3 equal 21.5e-5
+variable radius4 equal 30e-5
 
 # Fraction for each radius
 variable frac1 equal 0.1
@@ -71,7 +71,7 @@ variable density equal 8190
 
 # Fill time (s) and mass (kg)
 variable filltime equal 5
-variable fillmass equal 0.0005
+variable fillmass equal 0.00005
 variable fillmassrate equal ${fillmass}/${filltime}
 variable fillsteps equal ${filltime}/${dt}
 
@@ -81,7 +81,7 @@ variable settlesteps1 equal ${settletime1}/${dt}
 
 # Blade velocity (m/s) and time (s)
 variable bladevel equal -0.007
-variable bladetime equal 5
+variable bladetime equal 1
 variable bladesteps equal ${bladetime}/${dt}
 
 # Second settle time (s) and steps
@@ -110,37 +110,41 @@ fix integrator all nve/sphere
 fix gravi all gravity 9.81 vector 0.0 0.0 -1.0
 
 # Global material properties
-fix m1 all property/global youngModulus peratomtype ${youngmodulus1} ${youngmodulus2}
-fix m2 all property/global poissonRatio peratomtype ${poission1} ${poission2}
-fix m3 all property/global coefficientRestitution peratompair ${natoms} ${cor11} ${cor12} ${cor21} ${cor22}
-fix m4 all property/global coefficientFriction peratompair ${natoms} ${sf11} ${sf12} ${sf21} ${sf22}
-fix m5 all property/global coefficientRollingFriction peratompair ${natoms} ${rf11} ${rf12} ${rf21} ${rf22}
+fix m1 all property/global youngsModulus peratomtype ${youngsmodulus1} ${youngsmodulus2}
+fix m2 all property/global poissonsRatio peratomtype ${poission1} ${poission2}
+fix m3 all property/global coefficientRestitution atomtypepair ${natoms} ${cor11} ${cor12} ${cor21} ${cor22}
+fix m4 all property/global coefficientFriction atomtypepair ${natoms} ${sf11} ${sf12} ${sf21} ${sf22}
+fix m5 all property/global coefficientRollingFriction atomtypepair ${natoms} ${rf11} ${rf12} ${rf21} ${rf22}
 
 # Mesh surfaces, scaled from mm to m
 fix plate  all mesh/surface file Plate.stl  type 2 scale 0.001
 fix blade  all mesh/surface file Blade.stl  type 2 scale 0.001
-fix shims  all mesh/surface file Shims.stl  type 2 scale 0.001
+fix shims  all mesh/surface file Shims.stl  type 2 scale 0.001 curvature_tolerant yes
 fix ground all mesh/surface file Ground.stl type 2 scale 0.001
 
 # Combine all meshes into a single wall fix
 fix walls all wall/gran model hertz tangential history rolling_friction epsd2 mesh n_meshes 4 meshes plate blade shims ground
 
 # Templates for four different particle radii
-fix pts1 all particletemplate/sphere 202503 radius constant ${radius1}
-fix pts2 all particletemplate/sphere 202503 radius constant ${radius2}
-fix pts3 all particletemplate/sphere 202503 radius constant ${radius3}
-fix pts4 all particletemplate/sphere 202503 radius constant ${radius4}
+fix pts1 all particletemplate/sphere 15485863 atom_type 1 density constant ${density} radius constant ${radius1} volume_limit 1e-20
+fix pts2 all particletemplate/sphere 15485867 atom_type 1 density constant ${density} radius constant ${radius2} volume_limit 1e-20
+fix pts3 all particletemplate/sphere 32452843 atom_type 1 density constant ${density} radius constant ${radius3} volume_limit 1e-20
+fix pts4 all particletemplate/sphere 32452867 atom_type 1 density constant ${density} radius constant ${radius4} volume_limit 1e-20
 
 # Combined distribution of those four templates
-fix pdd1 all particledistribution 202503 ${nradii} pts1 ${frac1} pts2 ${frac2} pts3 ${frac3} pts4 ${frac4}
+fix pdd1 all particledistribution/discrete 49979687 ${nradii} pts1 ${frac1} pts2 ${frac2} pts3 ${frac3} pts4 ${frac4}
+
+#region for insertion
+group		nve_group region reg
+region	bc block ${xmin} ${xmax} ${ymin} ${ymax} ${zmin} ${zmax}  units box
 
 # Surface for particle insertion
-fix ins_mesh all mesh/surface/planar file Insertionface.stl type 1 scale 0.001
+fix ins_mesh all mesh/surface/planar file Insertionsface.stl type 1 scale 0.001
 
 # Insert particles with a stream
-fix ins insert/stream seed 202503 distributiontemplate pdd1 &
-     mass ${fillmass} massrate ${fillmassrate} overlap check yes all_in yes &
-     vel constant 0.0 0.0 -0.005 insertion_face ins_mesh extrude_length 0.25
+fix ins nve_group insert/stream seed 49979693 distributiontemplate pdd1 &
+     mass ${fillmass} massrate ${fillmassrate} overlapcheck yes all_in yes &
+     vel constant 0.0 0.0 -0.005 insertion_face ins_mesh extrude_length 0.001
 
 # Create output directory
 shell mkdir post
