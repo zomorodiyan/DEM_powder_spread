@@ -18,14 +18,12 @@ variable zmax equal  11e-3
 region reg block ${xmin} ${xmax} ${ymin} ${ymax} ${zmin} ${zmax} units box
 create_box 1 reg
 
-
 # Particle radii (meters, half of original diameters)
 variable radius1 equal 6.5e-5
 variable radius2 equal 12.5e-5
 variable radius3 equal 21.5e-5
 variable radius4 equal 30e-5
 variable neighlen equal 4e-4
-
 
 # Fill time (s) and mass (kg)
 variable filltime equal 1
@@ -77,9 +75,9 @@ fix m4 all property/global coefficientFriction atomtypepair 1 0.5
 fix m5 all property/global coefficientRollingFriction atomtypepair 1 1.0 
 
 # Mesh surfaces, scaled from mm to m
-fix plate  all mesh/surface file Plate.stl  type 1 scale 0.001 curvature_tolerant yes
-fix shims  all mesh/surface file Shims.stl  type 1 scale 0.001 curvature_tolerant yes
-fix blade  all mesh/surface file Blade.stl  type 1 scale 0.001 curvature_tolerant yes 
+fix plate  all mesh/surface file meshes/Plate.stl  type 1 scale 0.001 curvature_tolerant yes
+fix shims  all mesh/surface file meshes/Shims.stl  type 1 scale 0.001 curvature_tolerant yes
+fix blade  all mesh/surface file meshes/Blade.stl  type 1 scale 0.001 curvature_tolerant yes 
 
 # Combine plate and shims meshes into a single wall fix
 fix walls all wall/gran model hertz tangential history rolling_friction epsd2 mesh n_meshes 2 meshes plate shims
@@ -95,18 +93,17 @@ fix pts4 all particletemplate/sphere 32452867 atom_type 1 density constant ${den
 # Combined distribution of those four templates
 fix pdd1 all particledistribution/discrete 49979687 4 pts1 0.1 pts2 0.4 pts3 0.4 pts4 0.1
 
-
 #region for insertion
 group		nve_group region reg
 region	bc block ${xmin} ${xmax} ${ymin} ${ymax} ${zmin} ${zmax}  units box
 
 # Surface for particle insertion
-fix ins_mesh all mesh/surface file Insertion.stl type 1 scale 0.001 curvature_tolerant yes
+fix ins_mesh all mesh/surface file meshes/Insertion.stl type 1 scale 0.001 curvature_tolerant yes
 
 # Insert particles with a stream
 fix ins all insert/pack seed 49979693 distributiontemplate pdd1 &
-     insert_every 2000 overlapcheck yes all_in yes &
-     vel constant 0.0 0.0 -0.005 particles_in_region 1500 region bc
+  insert_every 2000 overlapcheck yes all_in yes &
+  vel constant 0.0 0.0 -0.005 particles_in_region 1500 region bc
 
 # Create output directory
 shell mkdir post
