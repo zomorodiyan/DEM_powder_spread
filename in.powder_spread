@@ -1,19 +1,10 @@
-# Set simulation style for granular DEM
+# Dump powder and sweep razor over shims to build a layer of powder on a plate
+
 atom_style granular
-
-# Fix all boundaries in x, y, z directions
 boundary f f f
-
-# Use SI units (m, s, kg, Pa, etc.)
-units si
-
-# Communicate single precision velocity data
+units si # SI units (m, s, kg, Pa, etc.)
 communicate single vel yes
-
-# Disable Newton's pair force optimization
 newton off
-
-# Time step size
 variable dt equal 1e-6
 
 # Define simulation box limits (in meters, converted from microns)
@@ -24,54 +15,21 @@ variable ymax equal  21e-3
 variable zmin equal -1e-3
 variable zmax equal  11e-3
 
-# Number of atom types: particle and wall
-variable natoms equal 2
+region reg block ${xmin} ${xmax} ${ymin} ${ymax} ${zmin} ${zmax} units box
+create_box 1 reg
 
-# Approximate properties for IN718 (Young's modulus, Poisson's ratio)
-variable youngsmodulus1 equal 2.0e8
-variable youngsmodulus2 equal 2.0e8
-variable poission1 equal 0.3
-variable poission2 equal 0.3
-
-# Coefficients of restitution
-variable cor11 equal 0.6
-variable cor12 equal 0.6
-variable cor21 equal 0.6
-variable cor22 equal 0.6
-
-# Coefficients of friction
-variable sf11 equal 0.3
-variable sf12 equal 0.36
-variable sf21 equal 0.36
-variable sf22 equal 0.0
-
-# Coefficients of rolling friction
-variable rf11 equal 0.8
-variable rf12 equal 0.8
-variable rf21 equal 0.8
-variable rf22 equal 0.8
-
-# Number of radii
-variable nradii equal 4
 
 # Particle radii (meters, half of original diameters)
 variable radius1 equal 6.5e-5
 variable radius2 equal 12.5e-5
 variable radius3 equal 21.5e-5
 variable radius4 equal 30e-5
+variable neighlen equal 4e-4
 
-# Fraction for each radius
-variable frac1 equal 0.1
-variable frac2 equal 0.4
-variable frac3 equal 0.4
-variable frac4 equal 0.1
-
-# Density of IN718 (kg/m^3)
-variable density equal 8190
 
 # Fill time (s) and mass (kg)
-variable filltime equal 5
-variable fillmass equal 0.00005
+variable filltime equal 1
+variable fillmass equal 0.0008
 variable fillmassrate equal ${fillmass}/${filltime}
 variable fillsteps equal ${filltime}/${dt}
 
@@ -81,24 +39,20 @@ variable settlesteps1 equal ${settletime1}/${dt}
 
 # Blade velocity (m/s) and time (s)
 variable bladevel equal -0.007
-variable bladetime equal 1
+variable bladetime equal 5
 variable bladesteps equal ${bladetime}/${dt}
 
 # Second settle time (s) and steps
 variable settletime2 equal 1
 variable settlesteps2 equal ${settletime2}/${dt}
 
-# Create simulation box with 2 atom types
-region reg block ${xmin} ${xmax} ${ymin} ${ymax} ${zmin} ${zmax} units box
-create_box 2 reg
-
 # Neighbor settings
-neighbor 1.0e-4 bin
+neighbor ${neighlen} bin
 neigh_modify delay 0
 
-# Contact model: Hertz, rolling friction
-pair_style gran model hertz tangential history rolling_friction epsd2
-pair_coeff * *
+#New pair style
+pair_style  gran model hertz tangential history #Hertzian without cohesion
+pair_coeff  * *
 
 # Use the defined time step
 timestep ${dt}
@@ -106,25 +60,32 @@ timestep ${dt}
 # Integrate particles with nve/sphere
 fix integrator all nve/sphere
 
+#output settings, include total thermal energy
+compute       1 all erotate/sphere
+thermo_style  custom step atoms ke c_1 vol
+thermo        10000
+thermo_modify lost ignore norm no
+
 # Apply gravitational acceleration downwards
 fix gravi all gravity 9.81 vector 0.0 0.0 -1.0
 
 # Global material properties
-fix m1 all property/global youngsModulus peratomtype ${youngsmodulus1} ${youngsmodulus2}
-fix m2 all property/global poissonsRatio peratomtype ${poission1} ${poission2}
-fix m3 all property/global coefficientRestitution atomtypepair ${natoms} ${cor11} ${cor12} ${cor21} ${cor22}
-fix m4 all property/global coefficientFriction atomtypepair ${natoms} ${sf11} ${sf12} ${sf21} ${sf22}
-fix m5 all property/global coefficientRollingFriction atomtypepair ${natoms} ${rf11} ${rf12} ${rf21} ${rf22}
+fix m1 all property/global youngsModulus peratomtype 5e6
+fix m2 all property/global poissonsRatio peratomtype 0.45
+fix m3 all property/global coefficientRestitution atomtypepair 1 0.3 
+fix m4 all property/global coefficientFriction atomtypepair 1 0.5 
+fix m5 all property/global coefficientRollingFriction atomtypepair 1 1.0 
 
 # Mesh surfaces, scaled from mm to m
-fix plate  all mesh/surface file Plate.stl  type 2 scale 0.001
-fix blade  all mesh/surface file Blade.stl  type 2 scale 0.001
-fix shims  all mesh/surface file Shims.stl  type 2 scale 0.001 curvature_tolerant yes
-fix ground all mesh/surface file Ground.stl type 2 scale 0.001
+fix plate  all mesh/surface file Plate.stl  type 1 scale 0.001 curvature_tolerant yes
+fix shims  all mesh/surface file Shims.stl  type 1 scale 0.001 curvature_tolerant yes
+fix blade  all mesh/surface file Blade.stl  type 1 scale 0.001 curvature_tolerant yes 
 
-# Combine all meshes into a single wall fix
-fix walls all wall/gran model hertz tangential history rolling_friction epsd2 mesh n_meshes 4 meshes plate blade shims ground
+# Combine plate and shims meshes into a single wall fix
+fix walls all wall/gran model hertz tangential history rolling_friction epsd2 mesh n_meshes 2 meshes plate shims
 
+# Density of IN718 (kg/m^3)
+variable density equal 8190
 # Templates for four different particle radii
 fix pts1 all particletemplate/sphere 15485863 atom_type 1 density constant ${density} radius constant ${radius1} volume_limit 1e-20
 fix pts2 all particletemplate/sphere 15485867 atom_type 1 density constant ${density} radius constant ${radius2} volume_limit 1e-20
@@ -132,19 +93,20 @@ fix pts3 all particletemplate/sphere 32452843 atom_type 1 density constant ${den
 fix pts4 all particletemplate/sphere 32452867 atom_type 1 density constant ${density} radius constant ${radius4} volume_limit 1e-20
 
 # Combined distribution of those four templates
-fix pdd1 all particledistribution/discrete 49979687 ${nradii} pts1 ${frac1} pts2 ${frac2} pts3 ${frac3} pts4 ${frac4}
+fix pdd1 all particledistribution/discrete 49979687 4 pts1 0.1 pts2 0.4 pts3 0.4 pts4 0.1
+
 
 #region for insertion
 group		nve_group region reg
 region	bc block ${xmin} ${xmax} ${ymin} ${ymax} ${zmin} ${zmax}  units box
 
 # Surface for particle insertion
-fix ins_mesh all mesh/surface/planar file Insertionsface.stl type 1 scale 0.001
+fix ins_mesh all mesh/surface file Insertion.stl type 1 scale 0.001 curvature_tolerant yes
 
 # Insert particles with a stream
-fix ins nve_group insert/stream seed 49979693 distributiontemplate pdd1 &
-     mass ${fillmass} massrate ${fillmassrate} overlapcheck yes all_in yes &
-     vel constant 0.0 0.0 -0.005 insertion_face ins_mesh extrude_length 0.001
+fix ins all insert/pack seed 49979693 distributiontemplate pdd1 &
+     insert_every 2000 overlapcheck yes all_in yes &
+     vel constant 0.0 0.0 -0.005 particles_in_region 1500 region bc
 
 # Create output directory
 shell mkdir post
@@ -153,12 +115,10 @@ shell mkdir post
 variable dumptime equal 0.05
 variable dumpstep equal ${dumptime}/${dt}
 
-# Dump particle data and mesh surfaces
-dump dmpparticle all custom ${dumpstep} post/particles_*.liggghts id type x y z vx vy vz fx fy fz radius mass
-dump dmpground  all mesh/stl  ${dumpstep} post/Ground*.stl ground
-dump dmpplate  all mesh/stl  ${dumpstep} post/Plate*.stl plate
-dump dmpshims  all mesh/stl  ${dumpstep} post/Shims*.stl shims
-dump dmpblade  all mesh/stl  ${dumpstep} post/Blade*.stl blade
+#make a dump of particles and the stl file 0
+run    1
+dump	dmp all custom/vtk ${dumpstep} post/particles_*.vtk id type type x y z ix iy iz vx vy vz fx fy fz omegax omegay omegaz radius
+dump 	dumpstl all mesh/stl ${dumpstep} post/dump*.stl
 
 # Run insertion phase
 run ${fillsteps}
@@ -170,12 +130,10 @@ unfix ins
 run ${settlesteps1}
 
 # Move blade in negative x direction
-fix MoveBlade Move/mesh mesh blade linear ${bladevel} 0.0 0.0
+fix MoveBlade all move/mesh mesh blade linear ${bladevel} 0.0 0.0
 run ${bladesteps}
 unfix MoveBlade
 
 # Second settling phase
 run ${settlesteps2}
-
-# How to run: liggghts -in powder_spread.liggghts
-# Post-processing: load files from 'post/' directory into ParaView.
+run 1000 
