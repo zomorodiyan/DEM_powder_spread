@@ -19,11 +19,11 @@ region reg block ${xmin} ${xmax} ${ymin} ${ymax} ${zmin} ${zmax} units box
 create_box 1 reg
 
 # Particle radii (meters, half of original diameters)
-variable radius1 equal 6.5e-5
-variable radius2 equal 12.5e-5
-variable radius3 equal 21.5e-5
-variable radius4 equal 30e-5
-variable neighlen equal 4e-4
+variable radius1 equal 6.5e-4
+variable radius2 equal 12.5e-4
+variable radius3 equal 21.5e-4
+variable radius4 equal 30e-4
+variable neighlen equal 4e-3
 
 # Fill time (s) and mass (kg)
 variable filltime equal 1
@@ -32,7 +32,7 @@ variable fillmassrate equal ${fillmass}/${filltime}
 variable fillsteps equal ${filltime}/${dt}
 
 # First settle time (s) and steps
-variable settletime1 equal 1
+variable settletime1 equal 0.1
 variable settlesteps1 equal ${settletime1}/${dt}
 
 # Blade velocity (m/s) and time (s)
@@ -80,7 +80,7 @@ fix shims  all mesh/surface file meshes/Shims.stl  type 1 scale 0.001 curvature_
 fix blade  all mesh/surface file meshes/Blade.stl  type 1 scale 0.001 curvature_tolerant yes 
 
 # Combine plate and shims meshes into a single wall fix
-fix walls all wall/gran model hertz tangential history rolling_friction epsd2 mesh n_meshes 2 meshes plate shims
+fix walls all wall/gran model hertz tangential history rolling_friction epsd2 mesh n_meshes 3 meshes plate shims blade
 
 # Density of IN718 (kg/m^3)
 variable density equal 8190
