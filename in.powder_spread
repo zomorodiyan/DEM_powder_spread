@@ -96,7 +96,7 @@ fix ins all insert/pack seed 49979693 distributiontemplate pdd1 &
 shell mkdir post
 compute c_erot all erotate/sphere
 thermo_style custom step atoms ke c_c_erot vol
-thermo 10000
+thermo 1000
 thermo_modify lost ignore norm no
 
 variable dumptime equal 0.05
@@ -110,7 +110,7 @@ dump dumpstl all mesh/stl ${dumpstep} post/dump*.stl
 run ${fillsteps}        # Insertion phase
 unfix ins
 
-run ${settlesteps}      # Settling phase
+#run ${settlesteps}      # Settling phase
 
 fix MoveBlade all move/mesh mesh blade linear 0.007 0.0 0.0
 run ${bladesteps}       # Blade movement
