@@ -8,16 +8,16 @@ newton off
 
 # --- Simulation Time Parameters ---
 variable dt           equal 1e-6
-variable filltime     equal 0.2
-variable settletime   equal 0.02
-variable bladetime    equal 1.0
+variable filltime     equal 0.1
+variable settletime   equal 0.02 #skip
+variable bladetime    equal 1.5
 variable fillsteps    equal ${filltime}/${dt}
 variable settlesteps  equal ${settletime}/${dt}
 variable bladesteps   equal ${bladetime}/${dt}
 timestep ${dt}
 
 # --- Domain Definition ---
-region reg block -3.75e-3 3.5e-3 -3.5e-3 3.5e-3 3.17e-3 3.67e-3 units box
+region reg block -4.76e-3 4.51e-3 -4.51e-3 4.51e-3 3.16e-3 3.68e-3 units box
 create_box 1 reg
 
 # --- Neighbor Settings ---
@@ -49,7 +49,7 @@ fix walls all wall/gran model hertz tangential history rolling_friction epsd2 me
 # --- Powder Characteristics ---
 variable density equal 8190          # kg/m³
 variable fillmass equal 0.0004       # Total fill mass (kg)
-variable insertions equal 10         # Number of insertion steps
+variable insertions equal 1          # Number of insertion steps
 
 # Radii
 variable radius1 equal 6.5e-6
@@ -85,7 +85,7 @@ fix pts4 all particletemplate/sphere 32452867 atom_type 1 density constant ${den
 fix pdd1 all particledistribution/discrete 49979687 4 pts1 ${f1} pts2 ${f2} pts3 ${f3} pts4 ${f4}
 
 # --- Insertion Region ---
-region ins_reg block -3.0e-3 3.0e-3 -3.0e-3 3.0e-3 3.37e-3 3.67e-3 units box
+region ins_reg block -4.0e-3 4.0e-3 -4.0e-3 4.0e-3 3.37e-3 3.67e-3 units box
 
 # --- Particle Insertion ---
 fix ins all insert/pack seed 49979693 distributiontemplate pdd1 &
@@ -93,7 +93,7 @@ fix ins all insert/pack seed 49979693 distributiontemplate pdd1 &
   vel constant 0.0 0.0 0.0 particles_in_region ${particles_per_insert} region ins_reg
 
 # --- Output ---
-shell mkdir post
+shell mkdir post80
 compute c_erot all erotate/sphere
 thermo_style custom step atoms ke c_c_erot vol
 thermo 10000
@@ -103,13 +103,13 @@ variable dumptime equal 0.01
 variable dumpstep equal ${dumptime}/${dt}
 
 run 1
-dump dmp all custom/vtk ${dumpstep} post/particles_*.vtk id type type x y z ix iy iz vx vy vz fx fy fz omegax omegay omegaz radius
-dump dumpstl all mesh/stl ${dumpstep} post/dump*.stl
+dump dmp all custom/vtk ${dumpstep} post80/particles_*.vtk id type type x y z ix iy iz vx vy vz fx fy fz omegax omegay omegaz radius
+dump dumpstl all mesh/stl ${dumpstep} post80/dump*.stl
 
 # --- Simulation Phases ---
 run ${fillsteps}        # Insertion phase
 unfix ins
-run ${settlesteps}      # Settling phase
-fix MoveBlade all move/mesh mesh blade linear 0.007 0.0 0.0
+#run ${settlesteps}      # Settling phase
+fix MoveBlade all move/mesh mesh blade linear 0.006 0.0 0.0
 run ${bladesteps}       # Blade movement
 unfix MoveBlade
