@@ -48,7 +48,7 @@ fix walls all wall/gran model hertz tangential history rolling_friction epsd2 me
 
 # --- Powder Characteristics ---
 variable density equal 8190          # kg/m³
-variable fillmass equal 0.0003        # Total fill mass (kg)
+variable fillmass equal 0.0004        # Total fill mass (kg)
 variable insertions equal 10         # Number of insertion steps
 
 # Radii
