@@ -96,7 +96,7 @@ fix ins all insert/pack seed 49979693 distributiontemplate pdd1 &
 shell mkdir post80
 compute c_erot all erotate/sphere
 thermo_style custom step atoms ke c_c_erot vol
-thermo 10000
+thermo 100
 thermo_modify lost ignore norm no
 
 variable dumptime equal 0.01
