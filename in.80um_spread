@@ -1,0 +1,115 @@
+# --- Powder spreading simulation script with dynamic insertion parameters ---
+
+atom_style granular
+units si
+boundary f f f
+communicate single vel yes
+newton off
+
+# --- Simulation Time Parameters ---
+variable dt           equal 1e-6
+variable filltime     equal 0.2
+variable settletime   equal 0.02
+variable bladetime    equal 1.0
+variable fillsteps    equal ${filltime}/${dt}
+variable settlesteps  equal ${settletime}/${dt}
+variable bladesteps   equal ${bladetime}/${dt}
+timestep ${dt}
+
+# --- Domain Definition ---
+region reg block -3.75e-3 3.5e-3 -3.5e-3 3.5e-3 3.17e-3 3.67e-3 units box
+create_box 1 reg
+
+# --- Neighbor Settings ---
+variable neighlen equal 5e-6
+neighbor ${neighlen} bin
+neigh_modify delay 0
+
+# --- Contact Model ---
+pair_style gran model hertz tangential history
+pair_coeff * *
+
+# --- Integration & Gravity ---
+fix integrator all nve/sphere
+fix gravi all gravity 9.81 vector 0.0 0.0 -1.0
+
+# --- Material Properties ---
+fix m1 all property/global youngsModulus peratomtype 5e6
+fix m2 all property/global poissonsRatio peratomtype 0.45
+fix m3 all property/global coefficientRestitution atomtypepair 1 0.3 
+fix m4 all property/global coefficientFriction atomtypepair 1 0.5 
+fix m5 all property/global coefficientRollingFriction atomtypepair 1 1.0 
+
+# --- Mesh Surfaces ---
+fix plate all mesh/surface file meshes/Plate.stl type 1 scale 0.001 curvature_tolerant yes
+fix blade all mesh/surface file meshes/Blade80.stl type 1 scale 0.001 curvature_tolerant yes
+
+fix walls all wall/gran model hertz tangential history rolling_friction epsd2 mesh n_meshes 2 meshes plate blade
+
+# --- Powder Characteristics ---
+variable density equal 8190          # kg/m³
+variable fillmass equal 0.0004       # Total fill mass (kg)
+variable insertions equal 10         # Number of insertion steps
+
+# Radii
+variable radius1 equal 6.5e-6
+variable radius2 equal 12.5e-6
+variable radius3 equal 21.5e-6
+variable radius4 equal 30e-6
+
+# Fractions
+variable f1 equal 0.1
+variable f2 equal 0.4
+variable f3 equal 0.4
+variable f4 equal 0.1
+
+# --- Average Particle Volume & Mass ---
+variable pi equal 3.141592653589793
+variable v1 equal ${f1}*(4.0/3.0)*${pi}*${radius1}^3
+variable v2 equal ${f2}*(4.0/3.0)*${pi}*${radius2}^3
+variable v3 equal ${f3}*(4.0/3.0)*${pi}*${radius3}^3
+variable v4 equal ${f4}*(4.0/3.0)*${pi}*${radius4}^3
+variable vavg equal ${v1}+${v2}+${v3}+${v4}
+
+variable mpavg equal ${vavg}*${density}
+variable nparticles equal ${fillmass}/${mpavg}
+variable particles_per_insert equal ${nparticles}/${insertions}
+variable insert_every equal ${filltime}/${insertions}/${dt}
+
+# --- Particle Templates & Distribution ---
+fix pts1 all particletemplate/sphere 15485863 atom_type 1 density constant ${density} radius constant ${radius1} volume_limit 1e-20
+fix pts2 all particletemplate/sphere 15485867 atom_type 1 density constant ${density} radius constant ${radius2} volume_limit 1e-20
+fix pts3 all particletemplate/sphere 32452843 atom_type 1 density constant ${density} radius constant ${radius3} volume_limit 1e-20
+fix pts4 all particletemplate/sphere 32452867 atom_type 1 density constant ${density} radius constant ${radius4} volume_limit 1e-20
+
+fix pdd1 all particledistribution/discrete 49979687 4 pts1 ${f1} pts2 ${f2} pts3 ${f3} pts4 ${f4}
+
+# --- Insertion Region ---
+region ins_reg block -3.0e-3 3.0e-3 -3.0e-3 3.0e-3 3.37e-3 3.67e-3 units box
+
+# --- Particle Insertion ---
+fix ins all insert/pack seed 49979693 distributiontemplate pdd1 &
+  insert_every ${insert_every} overlapcheck yes all_in yes &
+  vel constant 0.0 0.0 0.0 particles_in_region ${particles_per_insert} region ins_reg
+
+# --- Output ---
+shell mkdir post
+compute c_erot all erotate/sphere
+thermo_style custom step atoms ke c_c_erot vol
+thermo 10000
+thermo_modify lost ignore norm no
+
+variable dumptime equal 0.01
+variable dumpstep equal ${dumptime}/${dt}
+
+run 1
+dump dmp all custom/vtk ${dumpstep} post/particles_*.vtk id type type x y z ix iy iz vx vy vz fx fy fz omegax omegay omegaz radius
+dump dumpstl all mesh/stl ${dumpstep} post/dump*.stl
+
+# --- Simulation Phases ---
+run ${fillsteps}        # Insertion phase
+unfix ins
+run ${settlesteps}      # Settling phase
+fix MoveBlade all move/mesh mesh blade linear 0.007 0.0 0.0
+run ${bladesteps}       # Blade movement
+unfix MoveBlade
