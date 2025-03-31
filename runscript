@@ -1,1 +1,2 @@
-mpirun --oversubscribe -np 16 lmp_auto < in.powder_spread
+mpirun --oversubscribe -np 8 lmp_auto < in.80um_spread
+
